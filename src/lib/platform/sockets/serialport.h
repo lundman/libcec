@@ -86,6 +86,7 @@ namespace PLATFORM
       virtual void Close(void);
       virtual void Shutdown(void);
       virtual ssize_t Write(void* data, size_t len);
+      virtual int Ioctl(int request, void* data);
       virtual ssize_t Read(void* data, size_t len, uint64_t iTimeoutMs = 0);
 
       virtual bool IsOpen(void)

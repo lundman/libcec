@@ -180,6 +180,23 @@ enum {
    CEC_IOCTL_SET_REGISTER_CMD
 };
 
+#define TDA_IOCTL_BASE 0x40
+#define RELEASE 0xFF
+
+
+enum {
+   /* driver specific */
+   TDA_VERBOSE_ON_CMD = 0,
+   TDA_VERBOSE_OFF_CMD,
+   TDA_BYEBYE_CMD,
+   /* HDMI Tx */
+   TDA_GET_SW_VERSION_CMD,
+   TDA_SET_POWER_CMD,
+};
+
+#define TDA_IOCTL_SET_POWER _IOWR(TDA_IOCTL_BASE, TDA_SET_POWER_CMD,tda_power)
+
+
 typedef enum tmPowerState
 {
     tmPowerOn,                          // Device powered on      (D0 state)
@@ -190,6 +207,7 @@ typedef enum tmPowerState
 }   tmPowerState_t, *ptmPowerState_t;
 
 typedef tmPowerState_t cec_power;
+typedef tmPowerState_t tda_power;
 
 typedef struct tmSWVersion
 {
@@ -201,12 +219,36 @@ typedef struct tmSWVersion
 
 typedef tmSWVersion_t cec_sw_version;
 
+typedef enum
+{
+   CEC_LOGICAL_ADDRESS_TV                     = 0,  /*!< TV                    */
+   CEC_LOGICAL_ADDRESS_RECORDING_DEVICE_1     = 1,  /*!< Recording Device 1    */
+   CEC_LOGICAL_ADDRESS_RECORDING_DEVICE_2     = 2,  /*!< Recording Device 1    */
+   CEC_LOGICAL_ADDRESS_TUNER_1                = 3,  /*!< Tuner 1               */
+   CEC_LOGICAL_ADDRESS_PLAYBACK_DEVICE_1      = 4,  /*!< Playback Device 1     */
+} tmdlHdmiCECLogicalAddress_t;
+
+ typedef enum
+ {
+     TMDL_HDMICEC_CLOCK_XTAL,
+     TMDL_HDMICEC_CLOCK_FRO,
+     TMDL_HDMICEC_CLOCK_PCLK
+ } tmdlHdmiCecClockSource_t;
+
+typedef struct _tmdlHdmiCecInstanceSetup_t
+{
+    tmdlHdmiCECLogicalAddress_t DeviceLogicalAddress;
+    tmdlHdmiCecClockSource_t    cecClockSource;
+//  tmdlHdmiCECDeviceState_t    DeviceState;
+} tmdlHdmiCecInstanceSetup_t, *ptmdlHdmiCecInstanceSetup_t;
+      typedef tmdlHdmiCecInstanceSetup_t cec_setup;
+
 
 #define CEC_IOCTL_VERBOSE_ON _IO(CEC_IOCTL_BASE, CEC_VERBOSE_ON_CMD)
 #define CEC_IOCTL_VERBOSE_OFF _IO(CEC_IOCTL_BASE, CEC_VERBOSE_OFF_CMD)
 #define CEC_IOCTL_BYEBYE _IO(CEC_IOCTL_BASE, CEC_BYEBYE_CMD)
 
-#define CEC_IOCTL_RX_ADDR      _IOWR(CEC_IOCTL_BASE,CEC_IOCTL_RX_ADDR_CMD,unsigned char)
+#define CEC_IOCTL_RX_ADDR      _IOWR(CEC_IOCTL_BASE,CEC_IOCTL_RX_ADDR_CMD,unsigned long)
 
 #define CEC_IOCTL_WAIT_FRAME      _IOWR(CEC_IOCTL_BASE,CEC_IOCTL_WAIT_FRAME_CMD,cec_frame)
 #define CEC_IOCTL_VERSION      _IOWR(CEC_IOCTL_BASE,CEC_IOCTL_VERSION_CMD,cec_version)
@@ -218,6 +260,7 @@ typedef tmSWVersion_t cec_sw_version;
 #define CEC_IOCTL_ACTIVE_SRC      _IO(CEC_IOCTL_BASE,CEC_IOCTL_ACTIVE_SRC_CMD)
 #define CEC_IOCTL_GET_SW_VERSION      _IOWR(CEC_IOCTL_BASE,CEC_IOCTL_GET_SW_VERSION_CMD,cec_sw_version)
 #define CEC_IOCTL_GIVE_PHY_ADDR      _IO(CEC_IOCTL_BASE,CEC_IOCTL_GIVE_PHY_ADDR_CMD)
+#define CEC_IOCTL_INSTANCE_SETUP      _IOWR(CEC_IOCTL_BASE,CEC_IOCTL_INSTANCE_SETUP_CMD,cec_setup)
 
 bool CioctlCECAdapterCommunication::CheckAdapter(uint32_t iTimeoutMs /* = 10000 */)
 {
@@ -298,6 +341,19 @@ bool CioctlCECAdapterCommunication::Open(IAdapterCommunicationCallback *cb, uint
       return true;
     }
 
+    {
+      int fd;
+      tda_power power;
+      fd = open("/dev/hdmitx", O_RDWR);
+      if (fd >=0) {
+        power = tmPowerOn;
+        fprintf(stderr, "Call TDA_IOCTL_SET_POWER (On) : %d\r\n",
+                ioctl(fd, TDA_IOCTL_SET_POWER, &power));
+      }
+    }
+
+
+
     m_callback = cb;
     CStdString strError;
     bool bConnected(false);
@@ -334,27 +390,46 @@ bool CioctlCECAdapterCommunication::Open(IAdapterCommunicationCallback *cb, uint
       int i;
       cec_power power;
       cec_sw_version vers;
-
+      unsigned long rx_addr;
+      int fd;
       memset(&vers, 0xAA, sizeof(vers));
 
       power = tmPowerOn;
+
+      // Apparently we need to call instance_setup first, or other calls fail.
+      cec_setup setup;
+      setup.DeviceLogicalAddress = CEC_LOGICAL_ADDRESS_PLAYBACK_DEVICE_1;
+      // What clock to use? XTAL, FRO or PCLK
+      setup.cecClockSource = TMDL_HDMICEC_CLOCK_XTAL;
+      fprintf(stderr, "Call CEC_IOCTL_INSTANCE_SETUP : %d\r\n",
+              m_port->Ioctl(CEC_IOCTL_INSTANCE_SETUP,&setup));
 
       fprintf(stderr, "Call CEC_IOCTL_GET_SW_VERSION_CMD : %d\r\n",
               m_port->Ioctl(CEC_IOCTL_GET_SW_VERSION,&vers));
       fprintf(stderr, "Version is comp: %08X, major: %08X, minor: %08X\r\n",
               vers.compatibilityNr, vers.majorVersionNr, vers.minorVersionNr);
 
-
       //fprintf(stderr, "Get CEC_IOCTL_BYEBYE: %d\r\n",
       //m_port->Ioctl(CEC_IOCTL_BYEBYE,NULL));
       //fprintf(stderr, "Call CEC_IOCTL_ACTIVE_SOURCE: %d\r\n",
-      //m_port->Ioctl(CEC_IOCTL_ACTIVE_SRC,NULL));
+      //       m_port->Ioctl(CEC_IOCTL_ACTIVE_SRC,NULL));
+      //rx_addr = CEC_LOGICAL_ADDRESS_PLAYBACK_DEVICE_1;
+      //fprintf(stderr, "Call CEC_IOCTL_RX_ADDR: %d\r\n",
+      //        m_port->Ioctl(CEC_IOCTL_RX_ADDR,
+      //                     (void *)rx_addr));
+      power = tmPowerOn;
+      fprintf(stderr, "Call CEC_IOCTL_SET_POWER_STATE (On) : %d\r\n",
+              m_port->Ioctl(CEC_IOCTL_SET_POWER_STATE,&power));
 
-      fprintf(stderr, "Call CEC_IOCTL_GIVE_PHY_ADDR: %d\r\n",
-              m_port->Ioctl(CEC_IOCTL_GIVE_PHY_ADDR, NULL));
+      //fprintf(stderr, "Call CEC_IOCTL_GIVE_PHY_ADDR: %d\r\n",
+      //       m_port->Ioctl(CEC_IOCTL_GIVE_PHY_ADDR, NULL));
 
     }
 
+    // The drivers/video/display/nxp/comps/tmdlHdmiCEC/src/tmdlHdmiCEC.c
+    // file say:
+    // \brief This message is used by any device for device discovery - similar to
+    // ping in other protocols
     if (!m_port->Ioctl(CEC_IOCTL_POLLING_MSG,NULL))
       fprintf(stderr, "** IOCTL enabled polling\r\n");
 
@@ -595,6 +670,7 @@ bool CioctlCECAdapterCommunication::PingAdapter(void)
   {
     CLibCEC::AddLog(CEC_LOG_ERROR, "the adapter did not respond correctly to ioctl ");
   }
+  fprintf(stderr, "CEC version returned is %X\r\n", version);
   return true;
 
   //return SendCommand(MSGCODE_PING, params);

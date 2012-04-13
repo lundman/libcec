@@ -1,3 +1,7 @@
+
+lundman: forking to attempt to add NXP HDMI CEC device, as used with CuBox
+from Solid-Run.com
+
 This library provides support for the Pulse-Eight USB-CEC adapter.
 
 ===============================================================================

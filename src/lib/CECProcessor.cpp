@@ -33,6 +33,7 @@
 #include "CECProcessor.h"
 
 #include "adapter/USBCECAdapterCommunication.h"
+#include "adapter/ioctlCECAdapterCommunication.h"
 #include "devices/CECBusDevice.h"
 #include "devices/CECAudioSystem.h"
 #include "devices/CECPlaybackDevice.h"
@@ -160,6 +161,7 @@ void CCECProcessor::Close(void)
   }
 }
 
+/* We need to filter down the device type here, somehow */
 bool CCECProcessor::OpenConnection(const char *strPort, uint16_t iBaudRate, uint32_t iTimeoutMs, bool bStartListening /* = true */)
 {
   bool bReturn(false);
@@ -172,6 +174,12 @@ bool CCECProcessor::OpenConnection(const char *strPort, uint16_t iBaudRate, uint
       CLibCEC::AddLog(CEC_LOG_ERROR, "connection already opened");
       return false;
     }
+    /* DeviceType - FIXME */
+    fprintf(stderr, "** OPENING '%s'\r\n", strPort);
+
+    if (!strcmp(strPort, "/dev/hdmicec"))
+      m_communication = new CioctlCECAdapterCommunication(this, strPort, iBaudRate);
+    else
     m_communication = new CUSBCECAdapterCommunication(this, strPort, iBaudRate);
     m_bConnectionOpened = (m_communication != NULL);
   }
@@ -1628,10 +1636,7 @@ bool CCECProcessor::SetConfiguration(const libcec_configuration *configuration)
 
   // client version 1.6.0
   if (configuration->clientVersion >= CEC_CLIENT_VERSION_1_6_0)
-  {
     m_configuration.bPowerOffDevicesOnStandby = configuration->bPowerOffDevicesOnStandby;
-    m_configuration.bShutdownOnStandby        = configuration->bShutdownOnStandby;
-  }
 
   // ensure that there is at least 1 device type set
   if (m_configuration.deviceTypes.IsEmpty())
@@ -1689,7 +1694,6 @@ bool CCECProcessor::GetCurrentConfiguration(libcec_configuration *configuration)
   {
     configuration->iFirmwareVersion          = m_configuration.iFirmwareVersion;
     configuration->bPowerOffDevicesOnStandby = m_configuration.bPowerOffDevicesOnStandby;
-    configuration->bShutdownOnStandby        = m_configuration.bShutdownOnStandby;
   }
 
   return true;

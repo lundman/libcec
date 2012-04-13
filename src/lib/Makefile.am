@@ -13,6 +13,8 @@ libcec_la_SOURCES = CECProcessor.cpp \
                     LibCECC.cpp \
                     adapter/USBCECAdapterCommunication.cpp \
                     adapter/USBCECAdapterDetection.cpp \
+                    adapter/ioctlCECAdapterCommunication.cpp \
+                    adapter/ioctlCECAdapterDetection.cpp \
                     devices/CECAudioSystem.cpp \
                     devices/CECBusDevice.cpp \
                     devices/CECPlaybackDevice.cpp \
@@ -24,6 +26,7 @@ libcec_la_SOURCES = CECProcessor.cpp \
                     implementations/SLCommandHandler.cpp \
                     implementations/VLCommandHandler.cpp \
 					implementations/RLCommandHandler.cpp \
+                    platform/posix/ioctlport.cpp \
                     platform/posix/serialport.cpp
 
 libcec_la_LDFLAGS = @LIBS@ -version-info @VERSION@

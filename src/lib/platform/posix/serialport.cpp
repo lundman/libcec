@@ -68,6 +68,11 @@ ssize_t CSerialSocket::Write(void* data, size_t len)
   return IsOpen() ? SocketWrite(m_socket, &m_iError, data, len) : -1;
 }
 
+int CSerialSocket::Ioctl(int request, void* data)
+{
+  return -1;
+}
+
 ssize_t CSerialSocket::Read(void* data, size_t len, uint64_t iTimeoutMs /* = 0 */)
 {
   return IsOpen() ? SocketRead(m_socket, &m_iError, data, len, iTimeoutMs) : -1;

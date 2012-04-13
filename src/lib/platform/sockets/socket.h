@@ -55,6 +55,7 @@ namespace PLATFORM
     virtual void Shutdown(void) = 0;
     virtual bool IsOpen(void) = 0;
     virtual ssize_t Write(void* data, size_t len) = 0;
+    virtual int Ioctl(int request, void* data) = 0;
     virtual ssize_t Read(void* data, size_t len, uint64_t iTimeoutMs = 0) = 0;
     virtual CStdString GetError(void) = 0;
     virtual int GetErrorNumber(void) = 0;
@@ -166,6 +167,17 @@ namespace PLATFORM
         return -EINVAL;
 
       ssize_t iReturn = m_socket->Write(data, len);
+      MarkReady();
+
+      return iReturn;
+    }
+
+    virtual int Ioctl(int request, void* data)
+    {
+      if (!m_socket || !WaitReady())
+        return -EINVAL;
+
+      int iReturn = m_socket->Ioctl(request, data);
       MarkReady();
 
       return iReturn;

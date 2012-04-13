@@ -34,6 +34,8 @@
 
 #include "adapter/USBCECAdapterDetection.h"
 #include "adapter/USBCECAdapterCommunication.h"
+#include "adapter/ioctlCECAdapterDetection.h"
+#include "adapter/ioctlCECAdapterCommunication.h"
 #include "CECProcessor.h"
 #include "devices/CECBusDevice.h"
 #include "platform/util/timeutils.h"
@@ -106,13 +108,16 @@ bool CLibCEC::EnableCallbacks(void *cbParam, ICECCallbacks *callbacks)
 int8_t CLibCEC::FindAdapters(cec_adapter *deviceList, uint8_t iBufSize, const char *strDevicePath /* = NULL */)
 {
   CStdString strDebug;
+  int found = 0;
   if (strDevicePath)
     strDebug.Format("trying to autodetect the com port for device path '%s'", strDevicePath);
   else
     strDebug.Format("trying to autodetect all CEC adapters");
   AddLog(CEC_LOG_DEBUG, strDebug);
 
-  return CUSBCECAdapterDetection::FindAdapters(deviceList, iBufSize, strDevicePath);
+  found = CUSBCECAdapterDetection::FindAdapters(deviceList, iBufSize, strDevicePath);
+  found += CioctlCECAdapterDetection::FindAdapters(deviceList, iBufSize, strDevicePath);
+  return found;
 }
 
 bool CLibCEC::PingAdapter(void)
